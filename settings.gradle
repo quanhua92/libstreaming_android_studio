@@ -1,1 +1,2 @@
-include ':streaming', ':streamandroidphone', ':streamusbcamera'
+include ':libuvccamera', ':streaming', ':streamandroidphone', ':streamusbcamera'
+project(':libuvccamera').projectDir = new File('UVCCamera/libuvccamera')
