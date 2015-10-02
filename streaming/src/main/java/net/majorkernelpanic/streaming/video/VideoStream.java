@@ -39,6 +39,9 @@ import net.majorkernelpanic.streaming.rtp.MediaCodecInputStream;
 import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
 import android.hardware.Camera.Parameters;
@@ -343,8 +346,13 @@ public abstract class VideoStream extends MediaStream {
 
 		try {
 			mMediaRecorder = new MediaRecorder();
-			mMediaRecorder.setCamera(mCamera);
-			mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+
+//			mMediaRecorder.setCamera(mCamera);
+//			mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+
+			Log.e(TAG, "HHQ use SURFACE");
+			mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+
 			mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 			mMediaRecorder.setVideoEncoder(mVideoEncoder);
 			mMediaRecorder.setPreviewDisplay(mSurfaceView.getHolder().getSurface());
@@ -352,7 +360,7 @@ public abstract class VideoStream extends MediaStream {
 			mMediaRecorder.setVideoFrameRate(mRequestedQuality.framerate);
 
 			// The bandwidth actually consumed is often above what was requested 
-			mMediaRecorder.setVideoEncodingBitRate((int)(mRequestedQuality.bitrate*0.8));
+			mMediaRecorder.setVideoEncodingBitRate((int) (mRequestedQuality.bitrate * 0.8));
 
 			// We write the output of the camera in a local socket instead of a file !			
 			// This one little trick makes streaming feasible quiet simply: data from the camera
@@ -367,6 +375,32 @@ public abstract class VideoStream extends MediaStream {
 
 			mMediaRecorder.prepare();
 			mMediaRecorder.start();
+
+			Surface surface = mMediaRecorder.getSurface();
+
+			Paint paint = new Paint();
+			paint.setTextSize(16);
+			paint.setColor(Color.RED);
+			int i;
+
+            /* Test: draw 10 frames at 30fps before start
+             * these should be dropped and not causing malformed stream.
+             */
+			for(i = 0; i < 20; i++) {
+				Canvas canvas = surface.lockCanvas(null);
+				int background = (i * 255 / 99);
+				canvas.drawARGB(255, background, background, background);
+				canvas.drawRGB(125, 125, 125);
+				String text = "Frame #" + i;
+				canvas.drawText(text, 100, 100, paint);
+				Log.e(TAG, text);
+				surface.unlockCanvasAndPost(canvas);
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 
 		} catch (Exception e) {
 			throw new ConfNotSupportedException(e.getMessage());
@@ -543,6 +577,8 @@ public abstract class VideoStream extends MediaStream {
 	 * @throws RuntimeException Might happen if another app is already using the camera.
 	 */
 	private void openCamera() throws RuntimeException {
+		Log.e(TAG, "openCamera");
+
 		final Semaphore lock = new Semaphore(0);
 		final RuntimeException[] exception = new RuntimeException[1];
 		mCameraThread = new Thread(new Runnable() {
@@ -566,6 +602,8 @@ public abstract class VideoStream extends MediaStream {
 	}
 
 	protected synchronized void createCamera() throws RuntimeException {
+		Log.e(TAG, "createCamera");
+
 		if (mSurfaceView == null)
 			throw new InvalidSurfaceException("Invalid surface !");
 		if (mSurfaceView.getHolder() == null || !mSurfaceReady) 
@@ -624,6 +662,7 @@ public abstract class VideoStream extends MediaStream {
 	}
 
 	protected synchronized void destroyCamera() {
+		Log.e(TAG, "destroyCamera");
 		if (mCamera != null) {
 			if (mStreaming) super.stop();
 			lockCamera();
@@ -641,7 +680,7 @@ public abstract class VideoStream extends MediaStream {
 	}
 
 	protected synchronized void updateCamera() throws RuntimeException {
-		
+		Log.e(TAG, "updateCamera");
 		// The camera is already correctly configured
 		if (mUpdated) return;
 		

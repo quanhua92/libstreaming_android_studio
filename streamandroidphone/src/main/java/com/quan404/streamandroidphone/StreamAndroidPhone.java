@@ -82,7 +82,8 @@ public class StreamAndroidPhone extends Activity implements RtspClient.Callback,
 
     @Override
     public void onBitrateUpdate(long bitrate) {
-        Log.d(TAG, "Bitrate: " + bitrate);
+
+//        Log.d(TAG, "Bitrate: " + bitrate);
     }
 
     @Override
@@ -153,7 +154,7 @@ public class StreamAndroidPhone extends Activity implements RtspClient.Callback,
         // Configures the SessionBuilder
         mSession = SessionBuilder.getInstance()
                 .setContext(getApplicationContext())
-                .setAudioEncoder(SessionBuilder.AUDIO_AAC)
+                .setAudioEncoder(SessionBuilder.AUDIO_NONE)
                 .setAudioQuality(new AudioQuality(8000, 16000))
                 .setVideoQuality(new VideoQuality(640, 480, 15, 200000))
                 .setVideoEncoder(SessionBuilder.VIDEO_H264)
