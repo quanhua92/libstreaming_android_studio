@@ -91,7 +91,7 @@ public abstract class VideoStream extends MediaStream {
 	 * Thread to draw on canvas
 	 */
 	private Thread canvasThread;
-
+	private Surface canvasSurface;
 
 	/** 
 	 * Don't use this class directly.
@@ -362,7 +362,7 @@ public abstract class VideoStream extends MediaStream {
 			mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 			mMediaRecorder.setVideoEncoder(mVideoEncoder);
 			mMediaRecorder.setPreviewDisplay(mSurfaceView.getHolder().getSurface());
-			mMediaRecorder.setVideoSize(mRequestedQuality.resX,mRequestedQuality.resY);
+			mMediaRecorder.setVideoSize(mRequestedQuality.resX, mRequestedQuality.resY);
 			mMediaRecorder.setVideoFrameRate(mRequestedQuality.framerate);
 
 			// The bandwidth actually consumed is often above what was requested 
@@ -382,9 +382,9 @@ public abstract class VideoStream extends MediaStream {
 			mMediaRecorder.prepare();
 			mMediaRecorder.start();
 
-			Surface surface = mMediaRecorder.getSurface();
-			canvasThread = new Thread(new MyTestThread(surface));
-			canvasThread.start();
+			canvasSurface = mMediaRecorder.getSurface();
+//			canvasThread = new Thread(new MyTestThread(canvasSurface));
+//			canvasThread.start();
 
 		} catch (Exception e) {
 			throw new ConfNotSupportedException(e.getMessage());
@@ -767,6 +767,9 @@ public abstract class VideoStream extends MediaStream {
 
 	}	
 
+	public Surface getSurface(){
+		return canvasSurface;
+	}
 
 	public class MyTestThread implements Runnable{
 		private Surface surface;

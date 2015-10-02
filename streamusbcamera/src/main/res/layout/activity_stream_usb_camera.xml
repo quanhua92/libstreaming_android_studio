@@ -19,5 +19,19 @@
             android:layout_centerVertical="true" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="5dp"
+        android:background="@android:color/black"
+        android:backgroundTintMode="multiply"
+        >
+        <net.majorkernelpanic.streaming.gl.SurfaceView
+            android:id="@+id/surface"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </LinearLayout>
+
 
 </LinearLayout>
