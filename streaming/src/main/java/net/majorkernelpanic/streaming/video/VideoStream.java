@@ -85,7 +85,13 @@ public abstract class VideoStream extends MediaStream {
 	protected String mEncoderName;
 	protected int mEncoderColorFormat;
 	protected int mCameraImageFormat;
-	protected int mMaxFps = 0;	
+	protected int mMaxFps = 0;
+
+	/**
+	 * Thread to draw on canvas
+	 */
+	private Thread canvasThread;
+
 
 	/** 
 	 * Don't use this class directly.
@@ -377,30 +383,8 @@ public abstract class VideoStream extends MediaStream {
 			mMediaRecorder.start();
 
 			Surface surface = mMediaRecorder.getSurface();
-
-			Paint paint = new Paint();
-			paint.setTextSize(16);
-			paint.setColor(Color.RED);
-			int i;
-
-            /* Test: draw 10 frames at 30fps before start
-             * these should be dropped and not causing malformed stream.
-             */
-			for(i = 0; i < 20; i++) {
-				Canvas canvas = surface.lockCanvas(null);
-				int background = (i * 255 / 99);
-				canvas.drawARGB(255, background, background, background);
-				canvas.drawRGB(125, 125, 125);
-				String text = "Frame #" + i;
-				canvas.drawText(text, 100, 100, paint);
-				Log.e(TAG, text);
-				surface.unlockCanvasAndPost(canvas);
-				try {
-					Thread.sleep(10);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
+			canvasThread = new Thread(new MyTestThread(surface));
+			canvasThread.start();
 
 		} catch (Exception e) {
 			throw new ConfNotSupportedException(e.getMessage());
@@ -676,7 +660,10 @@ public abstract class VideoStream extends MediaStream {
 			mCameraLooper.quit();
 			mUnlocked = false;
 			mPreviewStarted = false;
-		}	
+		}
+
+		if(canvasThread != null && canvasThread.isAlive())
+			canvasThread.interrupt();
 	}
 
 	protected synchronized void updateCamera() throws RuntimeException {
@@ -780,4 +767,44 @@ public abstract class VideoStream extends MediaStream {
 
 	}	
 
+
+	public class MyTestThread implements Runnable{
+		private Surface surface;
+		public MyTestThread(Surface inputSurface){
+			surface = inputSurface;
+		}
+		@Override
+		public void run() {
+			Paint paint = new Paint();
+			paint.setTextSize(16);
+			paint.setColor(Color.RED);
+			int i;
+
+			/* Test: draw 10 frames at 30fps before start
+			 * these should be dropped and not causing malformed stream.
+			 */
+			for(i = 0; i < 20000; i++) {
+				try{
+					if(!surface.isValid()) return;
+					Canvas canvas = surface.lockCanvas(null);
+					int background = (i * 255 / 99);
+					canvas.drawARGB(255, background, background, background);
+					canvas.drawRGB(125, 125, 125);
+					String text = "Frame #" + i;
+					canvas.drawText(text, 100, 100, paint);
+					Log.e(TAG, text);
+					surface.unlockCanvasAndPost(canvas);
+
+				}catch (Exception e){
+					e.printStackTrace();
+					return;
+				}
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
 }
