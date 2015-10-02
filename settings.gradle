@@ -1,1 +1,1 @@
-include ':streaming', ':streamandroidphone'
+include ':streaming', ':streamandroidphone', ':streamusbcamera'
