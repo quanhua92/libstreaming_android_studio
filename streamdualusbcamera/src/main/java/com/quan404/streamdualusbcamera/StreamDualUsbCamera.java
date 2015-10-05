@@ -1,24 +1,42 @@
 package com.quan404.streamdualusbcamera;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.SurfaceTexture;
 import android.hardware.usb.UsbDevice;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
+import android.view.SurfaceHolder;
 import android.view.View;
 import android.widget.Toast;
 
 import com.serenegiant.usb.CameraDialog;
+import com.serenegiant.usb.IFrameCallback;
 import com.serenegiant.usb.USBMonitor;
 import com.serenegiant.usb.UVCCamera;
 import com.serenegiant.widget.UVCCameraTextureView;
 
+import net.majorkernelpanic.streaming.Session;
+import net.majorkernelpanic.streaming.SessionBuilder;
+import net.majorkernelpanic.streaming.audio.AudioQuality;
+import net.majorkernelpanic.streaming.gl.SurfaceView;
+import net.majorkernelpanic.streaming.rtsp.RtspClient;
+import net.majorkernelpanic.streaming.video.VideoQuality;
+
+import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public class StreamDualUsbCamera extends Activity implements CameraDialog.CameraDialogParent{
+public class StreamDualUsbCamera extends Activity implements CameraDialog.CameraDialogParent, RtspClient.Callback,
+        Session.Callback, SurfaceHolder.Callback{
 
     // for debugging
     private static String TAG = "StreamDualUsbCamera";
@@ -45,12 +63,24 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
 
     private int SELECTED_ID = -1;
 
+
+    // Rtsp session
+    private boolean READY_FOR_STREAM = false;
+    private Session mSession;
+    private static RtspClient mClient;
+    private static SurfaceView mSurfaceView;
+
+    private Surface canvasSurface;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stream_dual_usb_camera);
 
         hideNavigationBar();
+
+        mSurfaceView = (SurfaceView) findViewById(R.id.surface);
+        mSurfaceView.getHolder().addCallback(this);
 
         mUVCCameraViewLeft = (UVCCameraTextureView) findViewById(R.id.cameraView01);
         mUVCCameraViewLeft.setOnClickListener(new View.OnClickListener() {
@@ -80,8 +110,69 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
 
 
         mUSBMonitor = new USBMonitor(this, mOnDeviceConnectListener);
+
+        new Thread(new MyStreamThread()).start();
+        // Initialize RTSP client
+        initRtspClient();
+    }
+    private void initRtspClient() {
+        // Configures the SessionBuilder
+        mSession = SessionBuilder.getInstance()
+                .setContext(getApplicationContext())
+                .setAudioEncoder(SessionBuilder.AUDIO_NONE)
+                .setAudioQuality(new AudioQuality(8000, 16000))
+                .setVideoQuality(new VideoQuality(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, 15, 200000))
+                .setVideoEncoder(SessionBuilder.VIDEO_H264)
+                .setPreviewOrientation(90)
+                .setSurfaceView(mSurfaceView)
+                .setCallback(this).build();
+
+        // Get Surface
+        canvasSurface = mSession.getVideoTrack().getSurface();
+
+        // Configures the RTSP client
+        mClient = new RtspClient();
+        mClient.setSession(mSession);
+        mClient.setCallback(this);
+
+        mSurfaceView.setAspectRatioMode(SurfaceView.ASPECT_RATIO_PREVIEW);
+
+        String ip, port, path;
+
+        // We parse the URI written in the Editext
+        Pattern uri = Pattern.compile("rtsp://(.+):(\\d+)/(.+)");
+        Matcher m = uri.matcher(AppConfig.STREAM_URL);
+        m.find();
+        ip = m.group(1);
+        port = m.group(2);
+        path = m.group(3);
+
+        mClient.setCredentials(AppConfig.PUBLISHER_USERNAME,
+                AppConfig.PUBLISHER_PASSWORD);
+        mClient.setServerAddress(ip, Integer.parseInt(port));
+        mClient.setStreamPath("/" + path);
+
+        Log.e(TAG, "done initRtsp");
     }
 
+    private void toggleStreaming() {
+        if(!READY_FOR_STREAM) return;
+
+        if (!mClient.isStreaming()) {
+            // Start camera preview
+            mSession.startPreview();
+
+            // Start video stream
+            mClient.startStream();
+        } else {
+            // already streaming, stop streaming
+            // stop camera preview
+            mSession.stopPreview();
+
+            // stop streaming
+            mClient.stopStream();
+        }
+    }
     @Override
     protected void onResume() {
         super.onResume();
@@ -183,6 +274,7 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
                         }
 
                         camera.setPreviewDisplay(mPreviewSurfaceLeft);
+                        camera.setFrameCallback(mIFrameCallbackLeft, UVCCamera.PIXEL_FORMAT_RGB565);
                         camera.startPreview();
                     }
 
@@ -201,6 +293,7 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
                         }
 
                         camera.setPreviewDisplay(mPreviewSurfaceRight);
+                        camera.setFrameCallback(mIFrameCallbackRight, UVCCamera.PIXEL_FORMAT_RGB565);
                         camera.startPreview();
                     }
 
@@ -226,6 +319,149 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
 
         }
     };
+
+    private static final int MAX_FRAME_AVAILABLE = 1;
+
+    private Semaphore flagLeft = new Semaphore(MAX_FRAME_AVAILABLE);
+    private final Bitmap bitmapLeft = Bitmap.createBitmap(UVCCamera.DEFAULT_PREVIEW_WIDTH, UVCCamera.DEFAULT_PREVIEW_HEIGHT, Bitmap.Config.RGB_565);
+    private final IFrameCallback mIFrameCallbackLeft = new IFrameCallback() {
+        @Override
+        public void onFrame(final ByteBuffer frame) {
+            frame.clear();
+            synchronized (bitmapLeft) {
+                bitmapLeft.copyPixelsFromBuffer(frame.asReadOnlyBuffer());
+
+                flagLeft.release(); //++
+            }
+        }
+    };
+
+    private Semaphore flagRight = new Semaphore(MAX_FRAME_AVAILABLE);
+    final Bitmap bitmapRight = Bitmap.createBitmap(UVCCamera.DEFAULT_PREVIEW_WIDTH, UVCCamera.DEFAULT_PREVIEW_HEIGHT, Bitmap.Config.RGB_565);
+    private final IFrameCallback mIFrameCallbackRight = new IFrameCallback() {
+        @Override
+        public void onFrame(final ByteBuffer frame) {
+            frame.clear();
+            synchronized (bitmapRight) {
+                bitmapRight.copyPixelsFromBuffer(frame.asReadOnlyBuffer());
+
+                flagRight.release(); //++
+            }
+        }
+    };
+
+    @Override
+    public void onBitrateUpdate(long bitrate) {
+
+    }
+
+    @Override
+    public void onSessionError(int reason, int streamType, Exception e) {
+
+    }
+
+    @Override
+    public void onPreviewStarted() {
+
+    }
+
+    @Override
+    public void onSessionConfigured() {
+
+    }
+
+    @Override
+    public void onSessionStarted() {
+
+    }
+
+    @Override
+    public void onSessionStopped() {
+
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder surfaceHolder) {
+
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
+
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
+
+    }
+
+    @Override
+    public void onRtspUpdate(int message, Exception exception) {
+
+    }
+
+    private class MyStreamThread implements Runnable{
+        @Override
+        public void run() {
+            flagLeft.drainPermits();
+            flagRight.drainPermits();
+            while(true){
+                try {
+                    flagLeft.acquire();//--
+                    flagRight.acquire();
+                    Bitmap left = bitmapLeft;
+                    Bitmap right = bitmapRight;
+
+                    if(!READY_FOR_STREAM){
+
+                        READY_FOR_STREAM = true;
+                        toggleStreaming();
+                    }
+
+                    Bitmap merge = Bitmap.createBitmap(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, Bitmap.Config.ARGB_8888); // merge left , right
+                    Canvas canvas = new Canvas(merge);
+                    canvas.drawBitmap(left, 0, 0, null);
+                    canvas.drawBitmap(right, left.getWidth(), 0, null);
+
+                    drawOnCanvas(merge);
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void drawOnCanvas(Bitmap bitmap){
+
+        Paint paint = new Paint();
+
+        /* Test: draw 10 frames at 30fps before start
+         * these should be dropped and not causing malformed stream.
+         */
+        try{
+            if(canvasSurface == null || !canvasSurface.isValid()) {
+                Log.d(TAG, "if(canvasSurface == null || !canvasSurface.isValid())");
+                canvasSurface = mSession.getVideoTrack().getSurface();
+                if(canvasSurface == null || !canvasSurface.isValid()) {
+                    Log.d(TAG, "if(canvasSurface == null || !canvasSurface.isValid()) READ OK");
+                }else{
+                    Log.d(TAG, "if(canvasSurface == null || !canvasSurface.isValid()) READ FAIL");
+                }
+                return;
+            }
+            Canvas canvas = canvasSurface.lockCanvas(null);
+            Log.d(TAG, "drawOnCanvas locked");
+
+            canvas.drawBitmap(bitmap, 0, 0, paint);
+
+            canvasSurface.unlockCanvasAndPost(canvas);
+
+        }catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+    }
 
     private void releaseUVCCamera(int id){
         if(DEBUG) Log.v(TAG, "releaseUVCCamera");

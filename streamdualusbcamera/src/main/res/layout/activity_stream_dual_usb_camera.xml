@@ -3,31 +3,54 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".DualCameraPreview"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:weightSum="12"
     >
+
     <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="6"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:background="@android:color/holo_green_light">
-        <com.serenegiant.widget.UVCCameraTextureView
-            android:id="@+id/cameraView01"
-            android:layout_width="match_parent"
+        android:orientation="horizontal"
+        android:weightSum="12">
+        <LinearLayout
+            android:layout_weight="6"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            />
+            android:background="@android:color/holo_green_light">
+            <com.serenegiant.widget.UVCCameraTextureView
+                android:id="@+id/cameraView01"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_weight="6"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:background="@android:color/holo_orange_dark">
+            <com.serenegiant.widget.UVCCameraTextureView
+                android:id="@+id/cameraView02"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
         android:layout_weight="6"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:background="@android:color/holo_orange_dark">
-        <com.serenegiant.widget.UVCCameraTextureView
-            android:id="@+id/cameraView02"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            />
+        android:padding="5dp"
+        android:background="@android:color/black"
+        android:backgroundTintMode="multiply"
+        >
+        <net.majorkernelpanic.streaming.gl.SurfaceView
+            android:id="@+id/surface"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
     </LinearLayout>
 
 </LinearLayout>
