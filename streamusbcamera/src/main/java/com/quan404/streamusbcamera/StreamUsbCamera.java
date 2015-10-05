@@ -5,9 +5,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.usb.UsbDevice;
 import android.os.Bundle;
@@ -42,7 +44,7 @@ public class StreamUsbCamera extends Activity implements CameraDialog.CameraDial
         Session.Callback, SurfaceHolder.Callback{
 
     // for debugging
-    private static String TAG = "SingleCameraPreview";
+    private static String TAG = "StreamUsbCamera";
     private static boolean DEBUG = true;
 
     // for thread pool
@@ -72,7 +74,9 @@ public class StreamUsbCamera extends Activity implements CameraDialog.CameraDial
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stream_usb_camera);
-
+        
+        mSurfaceView = (SurfaceView) findViewById(R.id.surface);
+        mSurfaceView.getHolder().addCallback(this);
 
         mUVCCameraView = (UVCCameraTextureView) findViewById(R.id.UVCCameraTextureView);
         mUVCCameraView.setAspectRatio(UVCCamera.DEFAULT_PREVIEW_WIDTH * 1.0f / UVCCamera.DEFAULT_PREVIEW_HEIGHT);
@@ -89,10 +93,41 @@ public class StreamUsbCamera extends Activity implements CameraDialog.CameraDial
         mUSBMonitor = new USBMonitor(this, mOnDeviceConnectListener);
 
         // Initialize RTSP client
-        mSurfaceView = (SurfaceView) findViewById(R.id.surface);
-        mSurfaceView.getHolder().addCallback(this);
         initRtspClient();
     }
+
+    public void testBitmap(View view){
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inScaled = false;
+        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.raw.image, opts);
+
+        if(!READY_FOR_STREAM){
+
+            READY_FOR_STREAM = true;
+            toggleStreaming();
+        }
+
+        new Thread(new MyTestBitmapThread(bitmap)).start();
+    }
+
+    public class MyTestBitmapThread implements Runnable{
+        private Bitmap bitmap;
+        public MyTestBitmapThread(Bitmap bm){
+            bitmap = bm;
+        }
+        @Override
+        public void run() {
+            for(int i = 0 ; i < 1000 ; i++){
+
+                drawOnCanvas(bitmap, "#Frame " + i);
+                try {
+                    Thread.sleep(80);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    };
 
     @Override
     protected void onResume() {
@@ -235,6 +270,8 @@ public class StreamUsbCamera extends Activity implements CameraDialog.CameraDial
                 AppConfig.PUBLISHER_PASSWORD);
         mClient.setServerAddress(ip, Integer.parseInt(port));
         mClient.setStreamPath("/" + path);
+
+        Log.e(TAG, "done initRtsp");
     }
 
     private void toggleStreaming() {
@@ -390,12 +427,12 @@ public class StreamUsbCamera extends Activity implements CameraDialog.CameraDial
                     toggleStreaming();
                 }
 
-                drawOnCanvas(bitmap);
+                drawOnCanvas(bitmap, "");
             }
         }
     };
 
-    private void drawOnCanvas(Bitmap bitmap){
+    private void drawOnCanvas(Bitmap bitmap, String text){
 
         Paint paint = new Paint();
 
@@ -403,11 +440,23 @@ public class StreamUsbCamera extends Activity implements CameraDialog.CameraDial
          * these should be dropped and not causing malformed stream.
          */
         try{
-            if(canvasSurface == null || !canvasSurface.isValid()) return;
+            if(canvasSurface == null || !canvasSurface.isValid()) {
+                Log.d(TAG, "if(canvasSurface == null || !canvasSurface.isValid())");
+                canvasSurface = mSession.getVideoTrack().getSurface();
+                if(canvasSurface == null || !canvasSurface.isValid()) {
+                    Log.d(TAG, "if(canvasSurface == null || !canvasSurface.isValid()) READ OK");
+                }else{
+                    Log.d(TAG, "if(canvasSurface == null || !canvasSurface.isValid()) READ FAIL");
+                }
+                return;
+            }
             Canvas canvas = canvasSurface.lockCanvas(null);
             Log.d(TAG, "drawOnCanvas locked");
 
             canvas.drawBitmap(bitmap, 0, 0, paint);
+
+            paint.setTextSize(20);
+            canvas.drawText(text, 100, 100, paint);
 
             canvasSurface.unlockCanvasAndPost(canvas);
 

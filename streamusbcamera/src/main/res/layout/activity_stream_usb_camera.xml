@@ -2,7 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".SingleCameraPreview">
+    tools:context=".SingleCameraPreview"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -18,6 +19,12 @@
             android:layout_centerHorizontal="true"
             android:layout_centerVertical="true" />
     </LinearLayout>
+
+    <Button
+        android:text="Test Bitmap"
+        android:onClick="testBitmap"
+        android:layout_width="match_parent"
+        android:layout_height="60dp" />
 
     <LinearLayout
         android:layout_width="wrap_content"
