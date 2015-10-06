@@ -126,7 +126,7 @@ public class H264Packetizer extends AbstractPacketizer implements Runnable {
 				stats.push(duration);
 				// Computes the average duration of a NAL unit
 				delay = stats.average();
-				Log.d(TAG,"duration: "+duration/1000000+" delay: "+delay/1000000);
+//				Log.d(TAG,"duration: "+duration/1000000+" delay: "+delay/1000000);
 
 			}
 		} catch (IOException e) {
@@ -152,7 +152,7 @@ public class H264Packetizer extends AbstractPacketizer implements Runnable {
 			naluLength = header[3]&0xFF | (header[2]&0xFF)<<8 | (header[1]&0xFF)<<16 | (header[0]&0xFF)<<24;
 			if (naluLength>100000 || naluLength<0) resync();
 
-			Log.e(TAG, "streamType: " + streamType + " nalulength: " + naluLength);
+//			Log.e(TAG, "streamType: " + streamType + " nalulength: " + naluLength);
 		} else if (streamType == 1) {
 			// NAL units are preceeded with 0x00000001
 			fill(header,0,5);

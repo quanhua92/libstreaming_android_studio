@@ -62,7 +62,8 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
     private Surface mPreviewSurfaceRight;
 
     private int SELECTED_ID = -1;
-
+    private int SELECTED_FPS = 24;
+    private long SELECTED_FRAME_TIME = 0;
 
     // Rtsp session
     private boolean READY_FOR_STREAM = false;
@@ -78,6 +79,8 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
         setContentView(R.layout.activity_stream_dual_usb_camera);
 
         hideNavigationBar();
+
+        SELECTED_FRAME_TIME = 1000L / SELECTED_FPS;
 
         mSurfaceView = (SurfaceView) findViewById(R.id.surface);
         mSurfaceView.getHolder().addCallback(this);
@@ -121,7 +124,7 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
                 .setContext(getApplicationContext())
                 .setAudioEncoder(SessionBuilder.AUDIO_AAC)
                 .setAudioQuality(new AudioQuality(8000, 16000))
-                .setVideoQuality(new VideoQuality(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, 12, 100000))
+                .setVideoQuality(new VideoQuality(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, SELECTED_FPS, 400000))
                 .setVideoEncoder(SessionBuilder.VIDEO_H264)
                 .setPreviewOrientation(90)
                 .setSurfaceView(mSurfaceView)
@@ -328,6 +331,8 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
         @Override
         public void onFrame(final ByteBuffer frame) {
             frame.clear();
+            Log.d(TAG, "hasFrame");
+
             synchronized (bitmapLeft) {
                 bitmapLeft.copyPixelsFromBuffer(frame.asReadOnlyBuffer());
 
@@ -342,11 +347,13 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
         @Override
         public void onFrame(final ByteBuffer frame) {
             frame.clear();
+
             synchronized (bitmapRight) {
                 bitmapRight.copyPixelsFromBuffer(frame.asReadOnlyBuffer());
 
                 flagRight.release(); //++
             }
+
         }
     };
 
@@ -424,6 +431,8 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
                     canvas.drawBitmap(right, left.getWidth(), 0, null);
 
                     drawOnCanvas(merge);
+
+                    Thread.sleep(SELECTED_FRAME_TIME);
 
                 } catch (InterruptedException e) {
                     e.printStackTrace();

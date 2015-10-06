@@ -345,7 +345,7 @@ public abstract class MediaStream implements Stream {
 			mReceiver.setSoTimeout(3000);
 			mSender = mLss.accept();
 			mSender.setSendBufferSize(500000);
-			
+
 		} else {
 			Log.e(TAG, "parcelFileDescriptors createPipe version = Lollipop");
 			mParcelFileDescriptors = ParcelFileDescriptor.createPipe();
