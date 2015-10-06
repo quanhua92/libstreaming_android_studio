@@ -119,9 +119,9 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
         // Configures the SessionBuilder
         mSession = SessionBuilder.getInstance()
                 .setContext(getApplicationContext())
-                .setAudioEncoder(SessionBuilder.AUDIO_NONE)
+                .setAudioEncoder(SessionBuilder.AUDIO_AAC)
                 .setAudioQuality(new AudioQuality(8000, 16000))
-                .setVideoQuality(new VideoQuality(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, 15, 200000))
+                .setVideoQuality(new VideoQuality(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, 12, 100000))
                 .setVideoEncoder(SessionBuilder.VIDEO_H264)
                 .setPreviewOrientation(90)
                 .setSurfaceView(mSurfaceView)
@@ -418,7 +418,7 @@ public class StreamDualUsbCamera extends Activity implements CameraDialog.Camera
                         toggleStreaming();
                     }
 
-                    Bitmap merge = Bitmap.createBitmap(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, Bitmap.Config.ARGB_8888); // merge left , right
+                    Bitmap merge = Bitmap.createBitmap(UVCCamera.DEFAULT_PREVIEW_WIDTH * 2, UVCCamera.DEFAULT_PREVIEW_HEIGHT, Bitmap.Config.RGB_565 ); // merge left , right
                     Canvas canvas = new Canvas(merge);
                     canvas.drawBitmap(left, 0, 0, null);
                     canvas.drawBitmap(right, left.getWidth(), 0, null);
